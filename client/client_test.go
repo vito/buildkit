@@ -2023,7 +2023,15 @@ func testResolveAndHosts(t *testing.T, sb integration.Sandbox) {
 	st := llb.Scratch()
 
 	run := func(cmd string) {
-		st = busybox.Run(llb.Shlex(cmd), llb.Dir("/wd")).AddMount("/wd", st)
+		st = busybox.Run(
+			llb.Shlex(cmd),
+			llb.Dir("/wd"),
+			llb.DNS(&pb.DNS{
+				Nameservers: []string{"1.2.3.4", "5.6.7.8"},
+				Options:     []string{"debug", "timeout:42"},
+				Search:      []string{"example.com", "example.org"},
+			}),
+		).AddMount("/wd", st)
 	}
 
 	run(`sh -c "cp /etc/resolv.conf ."`)
@@ -2046,7 +2054,11 @@ func testResolveAndHosts(t *testing.T, sb integration.Sandbox) {
 
 	dt, err := os.ReadFile(filepath.Join(destDir, "resolv.conf"))
 	require.NoError(t, err)
-	require.Contains(t, string(dt), "nameserver")
+	require.Contains(t, string(dt), "nameserver 1.2.3.4")
+	require.Contains(t, string(dt), "nameserver 5.6.7.8")
+	require.Contains(t, string(dt), "options debug timeout:42")
+	require.Contains(t, string(dt), "search example.com")
+	require.Contains(t, string(dt), "search example.org")
 
 	dt, err = os.ReadFile(filepath.Join(destDir, "hosts"))
 	require.NoError(t, err)
