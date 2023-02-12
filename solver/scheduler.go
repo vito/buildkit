@@ -2,6 +2,7 @@ package solver
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"sync"
 
@@ -11,7 +12,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-var debugScheduler = false // TODO: replace with logs in build trace
+var debugScheduler = true // TODO: replace with logs in build trace
 
 func init() {
 	if os.Getenv("BUILDKIT_SCHEDULER_DEBUG") == "1" {
@@ -153,6 +154,7 @@ func (s *scheduler) dispatch(e *edge) {
 
 	openOutgoing := make([]*edgePipe, 0, len(out))
 	for _, r := range s.outgoing[e] {
+		// TODO(vito): HMM?
 		if !r.Receiver.Status().Completed {
 			openOutgoing = append(openOutgoing, r)
 		}
@@ -190,7 +192,19 @@ func (s *scheduler) dispatch(e *edge) {
 		e.markFailed(pf, errors.New("buildkit scheduler error: return leaving incoming open. Please report this with BUILDKIT_SCHEDULER_DEBUG=1"))
 	}
 	if len(openIncoming) == 0 && len(openOutgoing) > 0 {
-		e.markFailed(pf, errors.New("buildkit scheduler error: return leaving outgoing open. Please report this with BUILDKIT_SCHEDULER_DEBUG=1"))
+		logs := ""
+		for _, p := range openOutgoing {
+			if p.From != nil {
+				logs += fmt.Sprintf("\t%s", p.From.edge.Vertex.Name())
+			}
+			if p.Target != nil {
+				logs += fmt.Sprintf(" => %s", p.Target.edge.Vertex.Name())
+			} else {
+				logs += " => nil"
+			}
+			logs += "\n"
+		}
+		e.markFailed(pf, fmt.Errorf("buildkit scheduler error: return leaving %d outgoing open. Please report this with BUILDKIT_SCHEDULER_DEBUG=1\n%s", len(openOutgoing), logs))
 	}
 }
 

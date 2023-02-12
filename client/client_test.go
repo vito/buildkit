@@ -12,6 +12,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
+	mrand "math/rand"
 	"net"
 	"net/http"
 	"os"
@@ -198,6 +199,7 @@ func TestIntegration(t *testing.T) {
 		testMountStubsDirectory,
 		testMountStubsTimestamp,
 		testSourcePolicy,
+		testInterruptRestart,
 	)
 }
 
@@ -349,6 +351,50 @@ func testBridgeNetworkingDNSNoRootless(t *testing.T, sb integration.Sandbox) {
 		return err
 	})
 	err = eg.Wait()
+	require.NoError(t, err)
+}
+
+func testInterruptRestart(t *testing.T, sb integration.Sandbox) {
+	ctx := sb.Context()
+
+	c, err := New(ctx, sb.Address())
+	require.NoError(t, err)
+	defer c.Close()
+
+	sleepDef, err := llb.Image("busybox").Run(llb.Shlexf("sleep infinity")).Marshal(ctx)
+	require.NoError(t, err)
+
+	_, err = c.Build(ctx, SolveOpt{}, "", func(ctx context.Context, gw gateway.Client) (*gateway.Result, error) {
+		for i := 0; true; i++ {
+			sleepCtx, interrupt := context.WithCancel(ctx)
+
+			exited := make(chan error, 1)
+			go func() {
+				_, err := gw.Solve(sleepCtx, gateway.SolveRequest{
+					Definition: sleepDef.ToPB(),
+					Evaluate:   true,
+				})
+				exited <- err
+			}()
+
+			// NB: fudge the number here a bit, it should happen pretty quickly,
+			// guessing it depends on machine's CPU perf
+			delay := time.Duration(mrand.Intn(5)) * time.Millisecond
+
+			select {
+			case <-time.After(delay):
+				t.Logf("%d ok after %s", i, delay)
+				interrupt() // interrupt for next iteration
+
+			case err := <-exited:
+				interrupt()
+				t.Logf("%d exited before %s", i, delay)
+				return nil, err
+			}
+		}
+
+		return gateway.NewResult(), nil
+	}, nil)
 	require.NoError(t, err)
 }
 
