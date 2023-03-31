@@ -124,9 +124,7 @@ func (c *Controller) Register(server *grpc.Server) {
 	controlapi.RegisterControlServer(server, c)
 	c.gatewayForwarder.Register(server)
 	tracev1.RegisterTraceServiceServer(server, c)
-
-	store := &roContentStore{c.opt.ContentStore}
-	contentapi.RegisterContentServer(server, contentserver.New(store))
+	contentapi.RegisterContentServer(server, contentserver.New(c.opt.ContentStore))
 }
 
 func (c *Controller) DiskUsage(ctx context.Context, r *controlapi.DiskUsageRequest) (*controlapi.DiskUsageResponse, error) {
