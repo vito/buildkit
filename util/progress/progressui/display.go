@@ -217,6 +217,7 @@ func (v *vertex) isCompleted() bool {
 }
 
 type vertexGroup struct {
+	id string
 	*vertex
 	subVtxs map[digest.Digest]client.Vertex
 }
@@ -241,8 +242,10 @@ func (vg *vertexGroup) refresh() (changed, newlyStarted, newlyRevealed bool) {
 			}
 			vg.intervals[subVtx.Started.UnixNano()] = newInterval
 
-			if !subVtx.ProgressGroup.Weak {
-				vg.hidden = false
+			for _, group := range subVtx.ProgressGroups {
+				if group.Id == vg.id && !group.Weak {
+					vg.hidden = false
+				}
 			}
 		}
 
@@ -442,14 +445,15 @@ func (t *trace) update(s *client.SolveStatus, termWidth int) {
 		if t.startTime == nil {
 			t.startTime = v.Started
 		}
-		if v.ProgressGroup != nil {
-			group, ok := t.groups[v.ProgressGroup.Id]
+		for _, g := range v.ProgressGroups {
+			group, ok := t.groups[g.Id]
 			if !ok {
 				group = &vertexGroup{
+					id: g.Id,
 					vertex: &vertex{
 						Vertex: &client.Vertex{
-							Digest: digest.Digest(v.ProgressGroup.Id),
-							Name:   v.ProgressGroup.Name,
+							Digest: digest.Digest(g.Id),
+							Name:   g.Name,
 						},
 						byID:          make(map[string]*status),
 						statusUpdates: make(map[string]struct{}),
@@ -461,12 +465,12 @@ func (t *trace) update(s *client.SolveStatus, termWidth int) {
 				if t.modeConsole {
 					group.term = vt100.NewVT100(termHeight, termWidth-termPad)
 				}
-				t.groups[v.ProgressGroup.Id] = group
+				t.groups[g.Id] = group
 				t.byDigest[group.Digest] = group.vertex
 			}
-			if _, ok := seenGroups[v.ProgressGroup.Id]; !ok {
-				groups = append(groups, v.ProgressGroup.Id)
-				seenGroups[v.ProgressGroup.Id] = struct{}{}
+			if _, ok := seenGroups[g.Id]; !ok {
+				groups = append(groups, g.Id)
+				seenGroups[g.Id] = struct{}{}
 			}
 			group.subVtxs[v.Digest] = *v
 			t.byDigest[v.Digest] = group.vertex
@@ -623,7 +627,7 @@ func (t *trace) displayInfo() (d displayInfo) {
 	}
 	d.countTotal = len(t.byDigest)
 	for _, v := range t.byDigest {
-		if v.ProgressGroup != nil || v.hidden {
+		if len(v.ProgressGroups) > 0 || v.hidden {
 			// don't count vtxs in a group, they are merged into a single vtx
 			d.countTotal--
 			continue

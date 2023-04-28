@@ -19,10 +19,10 @@ type Controller struct {
 	mu      sync.Mutex
 	id      string
 
-	Digest        digest.Digest
-	Name          string
-	WriterFactory progress.WriterFactory
-	ProgressGroup *pb.ProgressGroup
+	Digest         digest.Digest
+	Name           string
+	WriterFactory  progress.WriterFactory
+	ProgressGroups []*pb.ProgressGroup
 }
 
 var _ progress.Controller = &Controller{}
@@ -41,10 +41,10 @@ func (c *Controller) Start(ctx context.Context) (context.Context, func(error)) {
 
 		if c.Digest != "" {
 			c.writer.Write(c.id, client.Vertex{
-				Digest:        c.Digest,
-				Name:          c.Name,
-				Started:       c.started,
-				ProgressGroup: c.ProgressGroup,
+				Digest:         c.Digest,
+				Name:           c.Name,
+				Started:        c.started,
+				ProgressGroups: c.ProgressGroups,
 			})
 		}
 	}
@@ -60,12 +60,12 @@ func (c *Controller) Start(ctx context.Context) (context.Context, func(error)) {
 			}
 			if c.Digest != "" {
 				c.writer.Write(c.id, client.Vertex{
-					Digest:        c.Digest,
-					Name:          c.Name,
-					Started:       c.started,
-					Completed:     &now,
-					Error:         errString,
-					ProgressGroup: c.ProgressGroup,
+					Digest:         c.Digest,
+					Name:           c.Name,
+					Started:        c.started,
+					Completed:      &now,
+					Error:          errString,
+					ProgressGroups: c.ProgressGroups,
 				})
 			}
 			c.writer.Close()

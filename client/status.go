@@ -15,14 +15,14 @@ func NewSolveStatus(resp *controlapi.StatusResponse) *SolveStatus {
 	s := &SolveStatus{}
 	for _, v := range resp.Vertexes {
 		s.Vertexes = append(s.Vertexes, &Vertex{
-			Digest:        v.Digest,
-			Inputs:        v.Inputs,
-			Name:          v.Name,
-			Started:       v.Started,
-			Completed:     v.Completed,
-			Error:         v.Error,
-			Cached:        v.Cached,
-			ProgressGroup: v.ProgressGroup,
+			Digest:         v.Digest,
+			Inputs:         v.Inputs,
+			Name:           v.Name,
+			Started:        v.Started,
+			Completed:      v.Completed,
+			Error:          v.Error,
+			Cached:         v.Cached,
+			ProgressGroups: v.ProgressGroups,
 		})
 	}
 	for _, v := range resp.Statuses {
@@ -66,14 +66,14 @@ func (ss *SolveStatus) Marshal() (out []*controlapi.StatusResponse) {
 		sr := controlapi.StatusResponse{}
 		for _, v := range ss.Vertexes {
 			sr.Vertexes = append(sr.Vertexes, &controlapi.Vertex{
-				Digest:        v.Digest,
-				Inputs:        v.Inputs,
-				Name:          v.Name,
-				Started:       v.Started,
-				Completed:     v.Completed,
-				Error:         v.Error,
-				Cached:        v.Cached,
-				ProgressGroup: v.ProgressGroup,
+				Digest:         v.Digest,
+				Inputs:         v.Inputs,
+				Name:           v.Name,
+				Started:        v.Started,
+				Completed:      v.Completed,
+				Error:          v.Error,
+				Cached:         v.Cached,
+				ProgressGroups: v.ProgressGroups,
 			})
 		}
 		for _, v := range ss.Statuses {

@@ -228,7 +228,7 @@ func (p *textMux) print(t *trace) {
 		if !ok {
 			continue
 		}
-		if v.ProgressGroup != nil || v.hidden {
+		if len(v.ProgressGroups) > 0 || v.hidden {
 			// skip vtxs in a group (they are merged into a single vtx) and hidden ones
 			continue
 		}
@@ -260,7 +260,7 @@ func (p *textMux) print(t *trace) {
 		}
 		// make any open vertex active
 		for dgst, v := range t.byDigest {
-			if v.isStarted() && !v.isCompleted() && v.ProgressGroup == nil && !v.hidden {
+			if v.isStarted() && !v.isCompleted() && len(v.ProgressGroups) == 0 && !v.hidden {
 				p.printVtx(t, dgst)
 				return
 			}

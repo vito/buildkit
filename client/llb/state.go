@@ -511,8 +511,8 @@ func mergeMetadata(m1, m2 pb.OpMetadata) pb.OpMetadata {
 		m1.Caps[k] = true
 	}
 
-	if m2.ProgressGroup != nil {
-		m1.ProgressGroup = m2.ProgressGroup
+	if m2.ProgressGroups != nil {
+		m1.ProgressGroups = append(m1.ProgressGroups, m2.ProgressGroups...)
 	}
 
 	return m1
@@ -606,7 +606,8 @@ func LocalUniqueID(v string) ConstraintsOpt {
 
 func ProgressGroup(id, name string, weak bool) ConstraintsOpt {
 	return constraintsOptFunc(func(c *Constraints) {
-		c.Metadata.ProgressGroup = &pb.ProgressGroup{Id: id, Name: name, Weak: weak}
+		c.Metadata.ProgressGroups = append(c.Metadata.ProgressGroups,
+			&pb.ProgressGroup{Id: id, Name: name, Weak: weak})
 	})
 }
 

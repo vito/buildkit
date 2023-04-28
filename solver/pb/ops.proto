@@ -209,7 +209,7 @@ message OpMetadata {
 
 	map<string, bool> caps = 5 [(gogoproto.castkey) = "github.com/moby/buildkit/util/apicaps.CapID", (gogoproto.nullable) = false];
 
-	ProgressGroup progress_group = 6;
+	repeated ProgressGroup progress_groups = 7;
 }
 
 // Source is a source mapping description for a file

@@ -837,10 +837,10 @@ func (s *sharedOp) CacheMap(ctx context.Context, index int) (resp *cacheMapResp,
 					res.Opts = CacheOpts(make(map[interface{}]interface{}))
 				}
 				res.Opts[progressKey{}] = &controller.Controller{
-					WriterFactory: progress.FromContext(ctx),
-					Digest:        s.st.vtx.Digest(),
-					Name:          s.st.vtx.Name(),
-					ProgressGroup: s.st.vtx.Options().ProgressGroup,
+					WriterFactory:  progress.FromContext(ctx),
+					Digest:         s.st.vtx.Digest(),
+					Name:           s.st.vtx.Name(),
+					ProgressGroups: s.st.vtx.Options().ProgressGroups,
 				}
 				s.cacheRes = append(s.cacheRes, res)
 				s.cacheDone = done
@@ -961,10 +961,10 @@ func initClientVertex(v Vertex) client.Vertex {
 		inputDigests = append(inputDigests, inp.Vertex.Digest())
 	}
 	return client.Vertex{
-		Inputs:        inputDigests,
-		Name:          v.Name(),
-		Digest:        v.Digest(),
-		ProgressGroup: v.Options().ProgressGroup,
+		Inputs:         inputDigests,
+		Name:           v.Name(),
+		Digest:         v.Digest(),
+		ProgressGroups: v.Options().ProgressGroups,
 	}
 }
 
