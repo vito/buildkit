@@ -10,6 +10,7 @@ import (
 	"github.com/moby/buildkit/identity"
 	"github.com/moby/buildkit/session"
 	"github.com/moby/buildkit/solver/errdefs"
+	"github.com/moby/buildkit/solver/pb"
 	"github.com/moby/buildkit/util/flightcontrol"
 	"github.com/moby/buildkit/util/progress"
 	"github.com/moby/buildkit/util/progress/controller"
@@ -320,6 +321,17 @@ func (jl *Solver) load(v, parent Vertex, j *Job) (Vertex, error) {
 	return jl.loadUnlocked(v, parent, j, cache)
 }
 
+type vertexWithAppendedGroups struct {
+	Vertex
+	groups []*pb.ProgressGroup
+}
+
+func (v *vertexWithAppendedGroups) Options() VertexOptions {
+	opts := v.Vertex.Options()
+	opts.ProgressGroups = append(opts.ProgressGroups, v.groups...)
+	return opts
+}
+
 func (jl *Solver) loadUnlocked(v, parent Vertex, j *Job, cache map[Vertex]Vertex) (Vertex, error) {
 	if v, ok := cache[v]; ok {
 		return v, nil
@@ -359,7 +371,22 @@ func (jl *Solver) loadUnlocked(v, parent Vertex, j *Job, cache map[Vertex]Vertex
 		st, ok = jl.actives[dgst]
 	}
 
-	if !ok {
+	if ok {
+		newVtx := initClientVertex(v)
+
+		if len(newVtx.ProgressGroups) > 0 {
+			// append progress group
+			st.vtx = &vertexWithAppendedGroups{
+				Vertex: v,
+				groups: newVtx.ProgressGroups,
+			}
+
+			st.clientVertex.ProgressGroups = append(
+				st.clientVertex.ProgressGroups,
+				newVtx.ProgressGroups...,
+			)
+		}
+	} else {
 		st = &state{
 			opts:         jl.opts,
 			jobs:         map[*Job]struct{}{},
