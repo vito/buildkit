@@ -198,6 +198,7 @@ func TestIntegration(t *testing.T) {
 		testLLBMountPerformance,
 		testClientCustomGRPCOpts,
 		testMultipleRecordsWithSameLayersCacheImportExport,
+		testPoopProgressGroups,
 	)
 }
 
@@ -9149,4 +9150,80 @@ func testClientCustomGRPCOpts(t *testing.T, sb integration.Sandbox) {
 	require.NoError(t, err)
 
 	require.Contains(t, interceptedMethods, "/moby.buildkit.v1.Control/Solve")
+}
+
+func testPoopProgressGroups(t *testing.T, sb integration.Sandbox) {
+	requiresLinux(t)
+
+	ctx := sb.Context()
+
+	c, err := New(ctx, sb.Address())
+	require.NoError(t, err)
+	defer c.Close()
+
+	product := "buildkit_test"
+
+	status := make(chan *SolveStatus)
+	statusDone := make(chan struct{})
+	done := make(chan struct{})
+
+	var vertexes []*Vertex
+
+	go func() {
+		defer close(statusDone)
+		for {
+			select {
+			case st, ok := <-status:
+				if !ok {
+					return
+				}
+				vertexes = append(vertexes, st.Vertexes...)
+			case <-done:
+				return
+			}
+		}
+	}()
+
+	_, err = c.Build(ctx, SolveOpt{}, product, func(ctx context.Context, c gateway.Client) (*gateway.Result, error) {
+		args := llb.Args([]string{"echo", identity.NewID()})
+
+		for i := 1; i <= 10; i++ {
+			def, err := llb.Image("alpine:latest").Run(
+				args,
+				llb.ProgressGroup(fmt.Sprintf("group-%d", i), fmt.Sprintf("group %d", i), false),
+			).Marshal(ctx)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to marshal state")
+			}
+
+			_, err = c.Solve(ctx, gateway.SolveRequest{
+				Definition: def.ToPB(),
+				Evaluate:   true,
+			})
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to solve")
+			}
+		}
+
+		return gateway.NewResult(), nil
+	}, status)
+	require.NoError(t, err)
+
+	select {
+	case <-statusDone:
+	case <-time.After(10 * time.Second):
+		close(done)
+	}
+
+	<-statusDone
+
+	for _, v := range vertexes {
+		pl, err := json.Marshal(v)
+		require.NoError(t, err)
+		t.Log(string(pl))
+	}
+
+	require.Len(t, vertexes, 4)
+
+	checkAllReleasable(t, c, sb, true)
 }

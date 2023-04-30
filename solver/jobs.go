@@ -3,6 +3,7 @@ package solver
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -333,8 +334,8 @@ func (v *vertexWithAppendedGroups) Options() VertexOptions {
 }
 
 func (jl *Solver) loadUnlocked(v, parent Vertex, j *Job, cache map[Vertex]Vertex) (Vertex, error) {
-	if v, ok := cache[v]; ok {
-		return v, nil
+	if c, ok := cache[v]; ok {
+		return c, nil
 	}
 	origVtx := v
 
@@ -372,20 +373,26 @@ func (jl *Solver) loadUnlocked(v, parent Vertex, j *Job, cache map[Vertex]Vertex
 	}
 
 	if ok {
+		log.Println("!!!", dgst, "already loaded")
+
 		newVtx := initClientVertex(v)
 
 		if len(newVtx.ProgressGroups) > 0 {
-			// append progress group
-			st.vtx = &vertexWithAppendedGroups{
+			v = &vertexWithAppendedGroups{
 				Vertex: v,
 				groups: newVtx.ProgressGroups,
 			}
+
+			// append progress group
+			st.vtx = v
 
 			st.clientVertex.ProgressGroups = append(
 				st.clientVertex.ProgressGroups,
 				newVtx.ProgressGroups...,
 			)
 		}
+
+		log.Println("!!!", dgst, "new groups", st.clientVertex.ProgressGroups)
 	} else {
 		st = &state{
 			opts:         jl.opts,
@@ -725,7 +732,7 @@ func (s *sharedOp) LoadCache(ctx context.Context, rec *CacheRecord) (Result, err
 	if s.st.mspan.Span != nil {
 		ctx = trace.ContextWithSpan(ctx, s.st.mspan)
 	}
-	// no cache hit. start evaluating the node
+	// cache hit. start evaluating the node
 	span, ctx := tracing.StartSpan(ctx, "load cache: "+s.st.vtx.Name(), trace.WithAttributes(attribute.String("vertex", s.st.vtx.Digest().String())))
 	notifyCompleted := notifyStarted(ctx, &s.st.clientVertex, true)
 	res, err := s.Cache().Load(withAncestorCacheOpts(ctx, s.st), rec)
