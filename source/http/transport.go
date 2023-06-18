@@ -3,16 +3,27 @@ package http
 import (
 	"context"
 	"io"
+	"log"
 	"net"
 	"net/http"
+	"strings"
 
+	"github.com/moby/buildkit/identity"
 	"github.com/moby/buildkit/session"
 	"github.com/moby/buildkit/session/upload"
 	"github.com/pkg/errors"
 )
 
-func newTransport(rt http.RoundTripper, sm *session.Manager, g session.Group, hosts map[string]string) http.RoundTripper {
-	return &sessionHandler{rt: rt, sm: sm, g: g}
+func newTransport(rt http.RoundTripper, sm *session.Manager, g session.Group, hosts string) http.RoundTripper {
+	hostsMap := map[string]string{}
+	for _, pair := range strings.Split(hosts, "\n") {
+		fields := strings.Fields(pair)
+		if len(fields) < 2 {
+			continue
+		}
+		hostsMap[fields[0]] = fields[1]
+	}
+	return &sessionHandler{rt: rt, sm: sm, g: g, hosts: hostsMap}
 }
 
 type sessionHandler struct {
@@ -24,6 +35,10 @@ type sessionHandler struct {
 }
 
 func (h *sessionHandler) RoundTrip(req *http.Request) (*http.Response, error) {
+	id := identity.NewID()
+
+	log.Println("!!!!!!!! RT EXTRA HOSTS", id, req.URL.Host, h.hosts)
+
 	if host, port, err := net.SplitHostPort(req.URL.Host); err == nil {
 		remap, found := h.hosts[host]
 		if found {
@@ -35,6 +50,8 @@ func (h *sessionHandler) RoundTrip(req *http.Request) (*http.Response, error) {
 			req.URL.Host = remap
 		}
 	}
+
+	log.Println("!!!!!!!! RT REMAPPED", id, req.URL.Host, h.hosts)
 
 	if req.URL.Host != "buildkit-session" {
 		return h.rt.RoundTrip(req)

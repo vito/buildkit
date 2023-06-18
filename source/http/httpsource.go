@@ -17,7 +17,6 @@ import (
 
 	"github.com/docker/docker/pkg/idtools"
 	"github.com/moby/buildkit/cache"
-	"github.com/moby/buildkit/client/llb"
 	"github.com/moby/buildkit/session"
 	"github.com/moby/buildkit/snapshot"
 	"github.com/moby/buildkit/solver"
@@ -32,17 +31,12 @@ import (
 type Opt struct {
 	CacheAccessor cache.Accessor
 	Transport     http.RoundTripper
-
-	// Hosts specifies hostname overrides for the git clone. This allows a static
-	// hostname to be directed to different IPs without busting the cache.
-	Hosts llb.Hosts
 }
 
 type httpSource struct {
 	cache     cache.Accessor
 	locker    *locker.Locker
 	transport http.RoundTripper
-	hosts     map[string]string
 }
 
 func NewSource(opt Opt) (source.Source, error) {
@@ -50,15 +44,10 @@ func NewSource(opt Opt) (source.Source, error) {
 	if transport == nil {
 		transport = tracing.DefaultTransport
 	}
-	hosts := map[string]string{}
-	for _, h := range opt.Hosts {
-		hosts[h.Host] = h.IP.String()
-	}
 	hs := &httpSource{
 		cache:     opt.CacheAccessor,
 		locker:    locker.New(),
 		transport: transport,
-		hosts:     hosts,
 	}
 	return hs, nil
 }
@@ -88,8 +77,8 @@ func (hs *httpSource) Resolve(ctx context.Context, id source.Identifier, sm *ses
 	}, nil
 }
 
-func (hs *httpSourceHandler) client(g session.Group) *http.Client {
-	return &http.Client{Transport: newTransport(hs.transport, hs.sm, g, hs.hosts)}
+func (hs *httpSourceHandler) client(g session.Group, extraHosts string) *http.Client {
+	return &http.Client{Transport: newTransport(hs.transport, hs.sm, g, extraHosts)}
 }
 
 // urlHash is internal hash the etag is stored by that doesn't leak outside
@@ -182,7 +171,7 @@ func (hs *httpSourceHandler) CacheKey(ctx context.Context, g session.Group, inde
 		}
 	}
 
-	client := hs.client(g)
+	client := hs.client(g, hs.src.ExtraHosts)
 
 	// Some servers seem to have trouble supporting If-None-Match properly even
 	// though they return ETag-s. So first, optionally try a HEAD request with
@@ -404,7 +393,7 @@ func (hs *httpSourceHandler) Snapshot(ctx context.Context, g session.Group) (cac
 	}
 	req = req.WithContext(ctx)
 
-	client := hs.client(g)
+	client := hs.client(g, hs.src.ExtraHosts)
 
 	resp, err := client.Do(req)
 	if err != nil {
