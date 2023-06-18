@@ -6,6 +6,7 @@ package git
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -38,6 +39,8 @@ func gitMain() {
 		// current thread for any of this to behave predictably.
 		runtime.LockOSThread()
 
+		log.Printf("!!!!!!!!!!! GIT UNSHARE NEWNS: %q", extraHosts)
+
 		// Create a mount namespace, which the sub-process will inherit.
 		syscall.Unshare(syscall.CLONE_NEWNS)
 
@@ -45,6 +48,8 @@ func gitMain() {
 		if err := overrideHosts(extraHosts); err != nil {
 			panic(err)
 		}
+	} else {
+		log.Println("!!!!!!!!!!! GIT NO EXTRA_HOSTS")
 	}
 
 	// Reexec git command
@@ -107,20 +112,23 @@ func overrideHosts(extraHosts string) error {
 		return fmt.Errorf("create hosts override: %w", err)
 	}
 
-	_, err = hostsOverride.Write(currentHosts)
-	if err != nil {
+	if _, err := hostsOverride.Write(currentHosts); err != nil {
 		return fmt.Errorf("write current hosts: %w", err)
 	}
 
-	_, err = fmt.Fprintln(hostsOverride)
-	if err != nil {
+	if _, err := fmt.Fprintln(hostsOverride); err != nil {
 		return fmt.Errorf("write newline: %w", err)
 	}
 
-	_, err = fmt.Fprintln(hostsOverride, extraHosts)
-	if err != nil {
+	if _, err := fmt.Fprintln(hostsOverride, extraHosts); err != nil {
 		return fmt.Errorf("write extra hosts: %w", err)
 	}
+
+	if err := hostsOverride.Close(); err != nil {
+		return fmt.Errorf("close hosts override: %w", err)
+	}
+
+	log.Printf("!!! MOUNTING %q OVER /etc/hosts", hostsOverride.Name())
 
 	err = mount.Mount(hostsOverride.Name(), "/etc/hosts", "none", "bind,ro")
 	if err != nil {

@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"log"
 	"net/url"
 	"os"
 	"os/exec"
@@ -337,6 +338,8 @@ func (gs *gitSourceHandler) CacheKey(ctx context.Context, g session.Group, index
 
 	extraHosts := gs.src.ExtraHosts
 
+	log.Println("!!!!!!! GIT CACHEKEY EXTRA HOSTS", extraHosts)
+
 	ref := gs.src.Ref
 	if ref == "" {
 		ref, err = getDefaultBranch(ctx, gitDir, "", sock, knownHosts, extraHosts, gs.auth, gs.src.Remote)
@@ -419,6 +422,8 @@ func (gs *gitSourceHandler) Snapshot(ctx context.Context, g session.Group) (out 
 	}
 
 	extraHosts := gs.src.ExtraHosts
+
+	log.Println("!!!!!!! GIT SNAPSHOT EXTRA HOSTS", extraHosts)
 
 	ref := gs.src.Ref
 	if ref == "" {
@@ -652,7 +657,7 @@ func getGitSSHCommand(knownHosts string) string {
 
 func git(ctx context.Context, dir, sshAuthSock, knownHosts, extraHosts string, args ...string) (_ *bytes.Buffer, err error) {
 	for {
-		stdout, stderr, flush := logs.NewLogStreams(ctx, false)
+		stdout, stderr, flush := logs.NewLogStreams(ctx, true)
 		defer stdout.Close()
 		defer stderr.Close()
 		defer func() {

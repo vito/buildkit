@@ -37,7 +37,7 @@ type sessionHandler struct {
 func (h *sessionHandler) RoundTrip(req *http.Request) (*http.Response, error) {
 	id := identity.NewID()
 
-	log.Println("!!!!!!!! RT EXTRA HOSTS", id, req.URL.Host, h.hosts)
+	log.Println("!!! RT EXTRA HOSTS", id, req.URL.Host, h.hosts)
 
 	if host, port, err := net.SplitHostPort(req.URL.Host); err == nil {
 		remap, found := h.hosts[host]
@@ -51,7 +51,7 @@ func (h *sessionHandler) RoundTrip(req *http.Request) (*http.Response, error) {
 		}
 	}
 
-	log.Println("!!!!!!!! RT REMAPPED", id, req.URL.Host, h.hosts)
+	log.Println("!!! RT REMAPPED", id, req.URL.Host, h.hosts)
 
 	if req.URL.Host != "buildkit-session" {
 		return h.rt.RoundTrip(req)
