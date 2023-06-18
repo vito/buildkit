@@ -376,7 +376,7 @@ type Hosts []HostIP
 func (hosts Hosts) Format() string {
 	var out string
 	for _, h := range hosts {
-		out += fmt.Sprintf("%s %s\n", h.Host, h.IP)
+		out += fmt.Sprintf("%s %s\n", h.IP, h.Host)
 	}
 	return out
 }

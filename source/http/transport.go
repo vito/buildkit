@@ -21,7 +21,10 @@ func newTransport(rt http.RoundTripper, sm *session.Manager, g session.Group, ho
 		if len(fields) < 2 {
 			continue
 		}
-		hostsMap[fields[0]] = fields[1]
+		ip, hosts := fields[0], fields[1:]
+		for _, host := range hosts {
+			hostsMap[host] = ip
+		}
 	}
 	return &sessionHandler{rt: rt, sm: sm, g: g, hosts: hostsMap}
 }
