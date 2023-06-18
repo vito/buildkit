@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"io"
+	"net"
 	"net/http"
 
 	"github.com/moby/buildkit/session"
@@ -23,9 +24,16 @@ type sessionHandler struct {
 }
 
 func (h *sessionHandler) RoundTrip(req *http.Request) (*http.Response, error) {
-	remap, found := h.hosts[req.URL.Host]
-	if found {
-		req.URL.Host = remap
+	if host, port, err := net.SplitHostPort(req.URL.Host); err == nil {
+		remap, found := h.hosts[host]
+		if found {
+			req.URL.Host = net.JoinHostPort(remap, port)
+		}
+	} else {
+		remap, found := h.hosts[req.URL.Host]
+		if found {
+			req.URL.Host = remap
+		}
 	}
 
 	if req.URL.Host != "buildkit-session" {
