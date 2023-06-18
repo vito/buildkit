@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "crypto/sha256" // for opencontainers/go-digest
 	"encoding/json"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -305,6 +306,10 @@ func Git(remote, ref string, opts ...GitOption) State {
 		}
 		addCap(&gi.Constraints, pb.CapSourceGitMountSSHSock)
 	}
+	if len(gi.ExtraHosts) > 0 {
+		attrs[pb.AttrGitExtraHosts] = gi.ExtraHosts.Format()
+		addCap(&gi.Constraints, pb.CapSourceGitExtraHosts)
+	}
 
 	addCap(&gi.Constraints, pb.CapSourceGit)
 
@@ -329,6 +334,7 @@ type GitInfo struct {
 	addAuthCap       bool
 	KnownSSHHosts    string
 	MountSSHSock     string
+	ExtraHosts       Hosts
 }
 
 func KeepGitDir() GitOption {
@@ -362,6 +368,43 @@ func MountSSHSock(sshID string) GitOption {
 	return gitOptionFunc(func(gi *GitInfo) {
 		gi.MountSSHSock = sshID
 	})
+}
+
+type Hosts []HostIP
+
+// Format returns the hosts in /etc/hosts format.
+func (hosts Hosts) Format() string {
+	var out string
+	for _, h := range hosts {
+		out += fmt.Sprintf("%s %s\n", h.Host, h.IP)
+	}
+	return out
+}
+
+type ExtraHosts Hosts
+
+func WithExtraHosts(hosts ...HostIP) ExtraHosts {
+	return ExtraHosts(hosts)
+}
+
+var _ GitOption = ExtraHosts(nil)
+
+func (hosts ExtraHosts) SetGitOption(i *GitInfo) {
+	i.ExtraHosts = append(i.ExtraHosts, hosts...)
+}
+
+var _ HTTPOption = ExtraHosts(nil)
+
+func (hosts ExtraHosts) SetHTTPOption(i *HTTPInfo) {
+	i.ExtraHosts = append(i.ExtraHosts, hosts...)
+}
+
+var _ RunOption = ExtraHosts(nil)
+
+func (hosts ExtraHosts) SetRunOption(i *ExecInfo) {
+	for _, h := range hosts {
+		i.State = i.State.AddExtraHost(h.Host, h.IP)
+	}
 }
 
 // Scratch returns a state that represents an empty filesystem.
@@ -579,6 +622,10 @@ func HTTP(url string, opts ...HTTPOption) State {
 		attrs[pb.AttrHTTPGID] = strconv.Itoa(hi.GID)
 		addCap(&hi.Constraints, pb.CapSourceHTTPUIDGID)
 	}
+	if len(hi.ExtraHosts) > 0 {
+		attrs[pb.AttrHTTPExtraHosts] = hi.ExtraHosts.Format()
+		addCap(&hi.Constraints, pb.CapSourceHTTPExtraHosts)
+	}
 
 	addCap(&hi.Constraints, pb.CapSourceHTTP)
 	source := NewSource(url, attrs, hi.Constraints)
@@ -587,11 +634,12 @@ func HTTP(url string, opts ...HTTPOption) State {
 
 type HTTPInfo struct {
 	constraintsWrapper
-	Checksum digest.Digest
-	Filename string
-	Perm     int
-	UID      int
-	GID      int
+	Checksum   digest.Digest
+	Filename   string
+	Perm       int
+	UID        int
+	GID        int
+	ExtraHosts Hosts
 }
 
 type HTTPOption interface {

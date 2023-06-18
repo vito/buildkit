@@ -10,7 +10,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func newTransport(rt http.RoundTripper, sm *session.Manager, g session.Group) http.RoundTripper {
+func newTransport(rt http.RoundTripper, sm *session.Manager, g session.Group, hosts map[string]string) http.RoundTripper {
 	return &sessionHandler{rt: rt, sm: sm, g: g}
 }
 
@@ -18,9 +18,16 @@ type sessionHandler struct {
 	sm *session.Manager
 	rt http.RoundTripper
 	g  session.Group
+
+	hosts map[string]string
 }
 
 func (h *sessionHandler) RoundTrip(req *http.Request) (*http.Response, error) {
+	remap, found := h.hosts[req.URL.Host]
+	if found {
+		req.URL.Host = remap
+	}
+
 	if req.URL.Host != "buildkit-session" {
 		return h.rt.RoundTrip(req)
 	}

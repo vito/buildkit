@@ -18,6 +18,7 @@ type GitIdentifier struct {
 	AuthHeaderSecret string
 	MountSSHSock     string
 	KnownSSHHosts    string
+	ExtraHosts       string
 }
 
 func NewGitIdentifier(remoteURL string) (*GitIdentifier, error) {

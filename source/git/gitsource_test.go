@@ -294,11 +294,11 @@ func testFetchByTag(t *testing.T, tag, expectedCommitSubject string, isAnnotated
 	if keepGitDir {
 		if isAnnotatedTag {
 			// get commit sha that the annotated tag points to
-			annotatedTagCommit, err := git(ctx, dir, "", "", "rev-list", "-n", "1", tag)
+			annotatedTagCommit, err := git(ctx, dir, "", "", "", "rev-list", "-n", "1", tag)
 			require.NoError(t, err)
 
 			// get current commit sha
-			headCommit, err := git(ctx, dir, "", "", "rev-parse", "HEAD")
+			headCommit, err := git(ctx, dir, "", "", "", "rev-parse", "HEAD")
 			require.NoError(t, err)
 
 			// HEAD should match the actual commit sha (and not the sha of the annotated tag,
@@ -309,7 +309,7 @@ func testFetchByTag(t *testing.T, tag, expectedCommitSubject string, isAnnotated
 		// test that we checked out the correct commit
 		// (in the case of an annotated tag, this message is of the commit the annotated tag points to
 		// and not the message of the tag)
-		gitLogOutput, err := git(ctx, dir, "", "", "log", "-n", "1", "--format=%s")
+		gitLogOutput, err := git(ctx, dir, "", "", "", "log", "-n", "1", "--format=%s")
 		require.NoError(t, err)
 		require.True(t, strings.Contains(strings.TrimSpace(gitLogOutput.String()), expectedCommitSubject))
 	}

@@ -129,11 +129,11 @@ func (gs *gitSource) mountRemote(ctx context.Context, remote string, auth []stri
 		// implied default to suppress "hint:" output about not having a
 		// default initial branch name set which otherwise spams unit
 		// test logs.
-		if _, err := gitWithinDir(ctx, dir, "", "", "", auth, "-c", "init.defaultBranch=master", "init", "--bare"); err != nil {
+		if _, err := gitWithinDir(ctx, dir, "", "", "", "", auth, "-c", "init.defaultBranch=master", "init", "--bare"); err != nil {
 			return "", nil, errors.Wrapf(err, "failed to init repo at %s", dir)
 		}
 
-		if _, err := gitWithinDir(ctx, dir, "", "", "", auth, "remote", "add", "origin", remote); err != nil {
+		if _, err := gitWithinDir(ctx, dir, "", "", "", "", auth, "remote", "add", "origin", remote); err != nil {
 			return "", nil, errors.Wrapf(err, "failed add origin repo at %s", dir)
 		}
 
@@ -335,9 +335,11 @@ func (gs *gitSourceHandler) CacheKey(ctx context.Context, g session.Group, index
 		defer unmountKnownHosts()
 	}
 
+	extraHosts := gs.src.ExtraHosts
+
 	ref := gs.src.Ref
 	if ref == "" {
-		ref, err = getDefaultBranch(ctx, gitDir, "", sock, knownHosts, gs.auth, gs.src.Remote)
+		ref, err = getDefaultBranch(ctx, gitDir, "", sock, knownHosts, extraHosts, gs.auth, gs.src.Remote)
 		if err != nil {
 			return "", "", nil, false, err
 		}
@@ -345,7 +347,7 @@ func (gs *gitSourceHandler) CacheKey(ctx context.Context, g session.Group, index
 
 	// TODO: should we assume that remote tag is immutable? add a timer?
 
-	buf, err := gitWithinDir(ctx, gitDir, "", sock, knownHosts, gs.auth, "ls-remote", "origin", ref)
+	buf, err := gitWithinDir(ctx, gitDir, "", sock, knownHosts, extraHosts, gs.auth, "ls-remote", "origin", ref)
 	if err != nil {
 		return "", "", nil, false, errors.Wrapf(err, "failed to fetch remote %s", urlutil.RedactCredentials(remote))
 	}
@@ -416,9 +418,11 @@ func (gs *gitSourceHandler) Snapshot(ctx context.Context, g session.Group) (out 
 		defer unmountKnownHosts()
 	}
 
+	extraHosts := gs.src.ExtraHosts
+
 	ref := gs.src.Ref
 	if ref == "" {
-		ref, err = getDefaultBranch(ctx, gitDir, "", sock, knownHosts, gs.auth, gs.src.Remote)
+		ref, err = getDefaultBranch(ctx, gitDir, "", sock, knownHosts, extraHosts, gs.auth, gs.src.Remote)
 		if err != nil {
 			return nil, err
 		}
@@ -427,7 +431,7 @@ func (gs *gitSourceHandler) Snapshot(ctx context.Context, g session.Group) (out 
 	doFetch := true
 	if isCommitSHA(ref) {
 		// skip fetch if commit already exists
-		if _, err := gitWithinDir(ctx, gitDir, "", sock, knownHosts, nil, "cat-file", "-e", ref+"^{commit}"); err == nil {
+		if _, err := gitWithinDir(ctx, gitDir, "", sock, knownHosts, extraHosts, nil, "cat-file", "-e", ref+"^{commit}"); err == nil {
 			doFetch = false
 		}
 	}
@@ -451,10 +455,10 @@ func (gs *gitSourceHandler) Snapshot(ctx context.Context, g session.Group) (out 
 			// in case the ref is a branch and it now points to a different commit sha
 			// TODO: is there a better way to do this?
 		}
-		if _, err := gitWithinDir(ctx, gitDir, "", sock, knownHosts, gs.auth, args...); err != nil {
+		if _, err := gitWithinDir(ctx, gitDir, "", sock, knownHosts, extraHosts, gs.auth, args...); err != nil {
 			return nil, errors.Wrapf(err, "failed to fetch remote %s", urlutil.RedactCredentials(gs.src.Remote))
 		}
-		_, err = gitWithinDir(ctx, gitDir, "", sock, knownHosts, nil, "reflog", "expire", "--all", "--expire=now")
+		_, err = gitWithinDir(ctx, gitDir, "", sock, knownHosts, extraHosts, nil, "reflog", "expire", "--all", "--expire=now")
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to expire reflog for remote %s", urlutil.RedactCredentials(gs.src.Remote))
 		}
@@ -496,19 +500,19 @@ func (gs *gitSourceHandler) Snapshot(ctx context.Context, g session.Group) (out 
 		if err := os.MkdirAll(checkoutDir, 0711); err != nil {
 			return nil, err
 		}
-		_, err = gitWithinDir(ctx, checkoutDirGit, "", sock, knownHosts, nil, "-c", "init.defaultBranch=master", "init")
+		_, err = gitWithinDir(ctx, checkoutDirGit, "", sock, knownHosts, extraHosts, nil, "-c", "init.defaultBranch=master", "init")
 		if err != nil {
 			return nil, err
 		}
 		// Defense-in-depth: clone using the file protocol to disable local-clone
 		// optimizations which can be abused on some versions of Git to copy unintended
 		// host files into the build context.
-		_, err = gitWithinDir(ctx, checkoutDirGit, "", sock, knownHosts, nil, "remote", "add", "origin", "file://"+gitDir)
+		_, err = gitWithinDir(ctx, checkoutDirGit, "", sock, knownHosts, extraHosts, nil, "remote", "add", "origin", "file://"+gitDir)
 		if err != nil {
 			return nil, err
 		}
 
-		gitCatFileBuf, err := gitWithinDir(ctx, gitDir, "", sock, knownHosts, gs.auth, "cat-file", "-t", ref)
+		gitCatFileBuf, err := gitWithinDir(ctx, gitDir, "", sock, knownHosts, extraHosts, gs.auth, "cat-file", "-t", ref)
 		if err != nil {
 			return nil, err
 		}
@@ -519,26 +523,26 @@ func (gs *gitSourceHandler) Snapshot(ctx context.Context, g session.Group) (out 
 			pullref += ":refs/tags/" + pullref
 		} else if isCommitSHA(ref) {
 			pullref = "refs/buildkit/" + identity.NewID()
-			_, err = gitWithinDir(ctx, gitDir, "", sock, knownHosts, gs.auth, "update-ref", pullref, ref)
+			_, err = gitWithinDir(ctx, gitDir, "", sock, knownHosts, extraHosts, gs.auth, "update-ref", pullref, ref)
 			if err != nil {
 				return nil, err
 			}
 		} else {
 			pullref += ":" + pullref
 		}
-		_, err = gitWithinDir(ctx, checkoutDirGit, "", sock, knownHosts, gs.auth, "fetch", "-u", "--depth=1", "origin", pullref)
+		_, err = gitWithinDir(ctx, checkoutDirGit, "", sock, knownHosts, extraHosts, gs.auth, "fetch", "-u", "--depth=1", "origin", pullref)
 		if err != nil {
 			return nil, err
 		}
-		_, err = gitWithinDir(ctx, checkoutDirGit, checkoutDir, sock, knownHosts, nil, "checkout", "FETCH_HEAD")
+		_, err = gitWithinDir(ctx, checkoutDirGit, checkoutDir, sock, knownHosts, extraHosts, nil, "checkout", "FETCH_HEAD")
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to checkout remote %s", urlutil.RedactCredentials(gs.src.Remote))
 		}
-		_, err = gitWithinDir(ctx, checkoutDirGit, "", sock, knownHosts, nil, "remote", "set-url", "origin", urlutil.RedactCredentials(gs.src.Remote))
+		_, err = gitWithinDir(ctx, checkoutDirGit, "", sock, knownHosts, extraHosts, nil, "remote", "set-url", "origin", urlutil.RedactCredentials(gs.src.Remote))
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to set remote origin to %s", urlutil.RedactCredentials(gs.src.Remote))
 		}
-		_, err = gitWithinDir(ctx, checkoutDirGit, "", sock, knownHosts, nil, "reflog", "expire", "--all", "--expire=now")
+		_, err = gitWithinDir(ctx, checkoutDirGit, "", sock, knownHosts, extraHosts, nil, "reflog", "expire", "--all", "--expire=now")
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to expire reflog for remote %s", urlutil.RedactCredentials(gs.src.Remote))
 		}
@@ -554,7 +558,7 @@ func (gs *gitSourceHandler) Snapshot(ctx context.Context, g session.Group) (out 
 				return nil, errors.Wrapf(err, "failed to create temporary checkout dir")
 			}
 		}
-		_, err = gitWithinDir(ctx, gitDir, cd, sock, knownHosts, nil, "checkout", ref, "--", ".")
+		_, err = gitWithinDir(ctx, gitDir, cd, sock, knownHosts, extraHosts, nil, "checkout", ref, "--", ".")
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to checkout remote %s", urlutil.RedactCredentials(gs.src.Remote))
 		}
@@ -587,7 +591,7 @@ func (gs *gitSourceHandler) Snapshot(ctx context.Context, g session.Group) (out 
 		}
 	}
 
-	_, err = gitWithinDir(ctx, gitDir, checkoutDir, sock, knownHosts, gs.auth, "submodule", "update", "--init", "--recursive", "--depth=1")
+	_, err = gitWithinDir(ctx, gitDir, checkoutDir, sock, knownHosts, extraHosts, gs.auth, "submodule", "update", "--init", "--recursive", "--depth=1")
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to update submodules for %s", urlutil.RedactCredentials(gs.src.Remote))
 	}
@@ -628,12 +632,12 @@ func isCommitSHA(str string) bool {
 	return validHex.MatchString(str)
 }
 
-func gitWithinDir(ctx context.Context, gitDir, workDir, sshAuthSock, knownHosts string, auth []string, args ...string) (*bytes.Buffer, error) {
+func gitWithinDir(ctx context.Context, gitDir, workDir, sshAuthSock, knownHosts, extraHosts string, auth []string, args ...string) (*bytes.Buffer, error) {
 	a := append([]string{"--git-dir", gitDir}, auth...)
 	if workDir != "" {
 		a = append(a, "--work-tree", workDir)
 	}
-	return git(ctx, workDir, sshAuthSock, knownHosts, append(a, args...)...)
+	return git(ctx, workDir, sshAuthSock, knownHosts, extraHosts, append(a, args...)...)
 }
 
 func getGitSSHCommand(knownHosts string) string {
@@ -646,7 +650,7 @@ func getGitSSHCommand(knownHosts string) string {
 	return gitSSHCommand
 }
 
-func git(ctx context.Context, dir, sshAuthSock, knownHosts string, args ...string) (_ *bytes.Buffer, err error) {
+func git(ctx context.Context, dir, sshAuthSock, knownHosts, extraHosts string, args ...string) (_ *bytes.Buffer, err error) {
 	for {
 		stdout, stderr, flush := logs.NewLogStreams(ctx, false)
 		defer stdout.Close()
@@ -668,6 +672,7 @@ func git(ctx context.Context, dir, sshAuthSock, knownHosts string, args ...strin
 			"PATH=" + os.Getenv("PATH"),
 			"GIT_TERMINAL_PROMPT=0",
 			"GIT_SSH_COMMAND=" + getGitSSHCommand(knownHosts),
+			"EXTRA_HOSTS=" + extraHosts,
 			//	"GIT_TRACE=1",
 			"GIT_CONFIG_NOSYSTEM=1", // Disable reading from system gitconfig.
 			"HOME=/dev/null",        // Disable reading from user gitconfig.
@@ -713,8 +718,8 @@ func tokenScope(remote string) string {
 }
 
 // getDefaultBranch gets the default branch of a repository using ls-remote
-func getDefaultBranch(ctx context.Context, gitDir, workDir, sshAuthSock, knownHosts string, auth []string, remoteURL string) (string, error) {
-	buf, err := gitWithinDir(ctx, gitDir, workDir, sshAuthSock, knownHosts, auth, "ls-remote", "--symref", remoteURL, "HEAD")
+func getDefaultBranch(ctx context.Context, gitDir, workDir, sshAuthSock, knownHosts, extraHosts string, auth []string, remoteURL string) (string, error) {
+	buf, err := gitWithinDir(ctx, gitDir, workDir, sshAuthSock, knownHosts, extraHosts, auth, "ls-remote", "--symref", remoteURL, "HEAD")
 	if err != nil {
 		return "", errors.Wrapf(err, "error fetching default branch for repository %s", urlutil.RedactCredentials(remoteURL))
 	}
