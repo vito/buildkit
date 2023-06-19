@@ -45,9 +45,11 @@ func gitMain() {
 		syscall.Unshare(syscall.CLONE_NEWNS)
 
 		// Bind-mount over /etc/hosts.
-		if err := overrideHosts(extraHosts); err != nil {
+		cleanup, err := overrideHosts(extraHosts)
+		if err != nil {
 			panic(err)
 		}
+		defer cleanup()
 	} else {
 		log.Println("!!!!!!!!!!! GIT NO EXTRA_HOSTS")
 	}
@@ -101,41 +103,43 @@ func gitMain() {
 	os.Exit(0)
 }
 
-func overrideHosts(extraHosts string) error {
+func overrideHosts(extraHosts string) (func(), error) {
 	currentHosts, err := os.ReadFile("/etc/hosts")
 	if err != nil {
-		return fmt.Errorf("read current hosts: %w", err)
+		return nil, fmt.Errorf("read current hosts: %w", err)
 	}
 
 	hostsOverride, err := os.CreateTemp("", "buildkit-git-extra-hosts")
 	if err != nil {
-		return fmt.Errorf("create hosts override: %w", err)
+		return nil, fmt.Errorf("create hosts override: %w", err)
 	}
 
 	if _, err := hostsOverride.Write(currentHosts); err != nil {
-		return fmt.Errorf("write current hosts: %w", err)
+		return nil, fmt.Errorf("write current hosts: %w", err)
 	}
 
 	if _, err := fmt.Fprintln(hostsOverride); err != nil {
-		return fmt.Errorf("write newline: %w", err)
+		return nil, fmt.Errorf("write newline: %w", err)
 	}
 
 	if _, err := fmt.Fprintln(hostsOverride, extraHosts); err != nil {
-		return fmt.Errorf("write extra hosts: %w", err)
+		return nil, fmt.Errorf("write extra hosts: %w", err)
 	}
 
 	if err := hostsOverride.Close(); err != nil {
-		return fmt.Errorf("close hosts override: %w", err)
+		return nil, fmt.Errorf("close hosts override: %w", err)
 	}
 
 	log.Printf("!!! MOUNTING %q OVER /etc/hosts", hostsOverride.Name())
 
 	err = mount.Mount(hostsOverride.Name(), "/etc/hosts", "none", "bind,ro")
 	if err != nil {
-		return fmt.Errorf("mount hosts override: %w", err)
+		return nil, fmt.Errorf("mount hosts override: %w", err)
 	}
 
-	return nil
+	return func() {
+		hostsOverride.Close()
+	}, nil
 }
 
 func runProcessGroup(ctx context.Context, cmd *exec.Cmd) error {

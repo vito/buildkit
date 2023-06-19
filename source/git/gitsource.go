@@ -677,11 +677,13 @@ func git(ctx context.Context, dir, sshAuthSock, knownHosts, extraHosts string, a
 			"PATH=" + os.Getenv("PATH"),
 			"GIT_TERMINAL_PROMPT=0",
 			"GIT_SSH_COMMAND=" + getGitSSHCommand(knownHosts),
-			"EXTRA_HOSTS=" + extraHosts,
 			//	"GIT_TRACE=1",
 			"GIT_CONFIG_NOSYSTEM=1", // Disable reading from system gitconfig.
 			"HOME=/dev/null",        // Disable reading from user gitconfig.
 			"LC_ALL=C",              // Ensure consistent output.
+		}
+		if extraHosts != "" {
+			cmd.Env = append(cmd.Env, "EXTRA_HOSTS="+extraHosts)
 		}
 		if sshAuthSock != "" {
 			cmd.Env = append(cmd.Env, "SSH_AUTH_SOCK="+sshAuthSock)
