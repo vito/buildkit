@@ -310,6 +310,10 @@ func Git(remote, ref string, opts ...GitOption) State {
 		attrs[pb.AttrGitExtraHosts] = gi.ExtraHosts.Format()
 		addCap(&gi.Constraints, pb.CapSourceGitExtraHosts)
 	}
+	if len(gi.SearchDomains) > 0 {
+		attrs[pb.AttrGitSearchDomains] = gi.SearchDomains.Format()
+		addCap(&gi.Constraints, pb.CapSourceGitSearchDomains)
+	}
 
 	addCap(&gi.Constraints, pb.CapSourceGit)
 
@@ -335,6 +339,7 @@ type GitInfo struct {
 	KnownSSHHosts    string
 	MountSSHSock     string
 	ExtraHosts       Hosts
+	SearchDomains    SearchDomains
 }
 
 func KeepGitDir() GitOption {
@@ -405,6 +410,28 @@ func (hosts ExtraHosts) SetRunOption(i *ExecInfo) {
 	for _, h := range hosts {
 		i.State = i.State.AddExtraHost(h.Host, h.IP)
 	}
+}
+
+type SearchDomains []string
+
+func ParseSearchDomains(s string) SearchDomains {
+	return strings.Fields(s)
+}
+
+func (domains SearchDomains) Format() string {
+	return strings.Join(domains, " ")
+}
+
+var _ GitOption = SearchDomains(nil)
+
+func (domains SearchDomains) SetGitOption(i *GitInfo) {
+	i.SearchDomains = append(i.SearchDomains, domains...)
+}
+
+var _ HTTPOption = SearchDomains(nil)
+
+func (domains SearchDomains) SetHTTPOption(i *HTTPInfo) {
+	i.SearchDomains = append(i.SearchDomains, domains...)
 }
 
 // Scratch returns a state that represents an empty filesystem.
@@ -626,6 +653,10 @@ func HTTP(url string, opts ...HTTPOption) State {
 		attrs[pb.AttrHTTPExtraHosts] = hi.ExtraHosts.Format()
 		addCap(&hi.Constraints, pb.CapSourceHTTPExtraHosts)
 	}
+	if len(hi.SearchDomains) > 0 {
+		attrs[pb.AttrHTTPSearchDomains] = hi.SearchDomains.Format()
+		addCap(&hi.Constraints, pb.CapSourceHTTPExtraHosts)
+	}
 
 	addCap(&hi.Constraints, pb.CapSourceHTTP)
 	source := NewSource(url, attrs, hi.Constraints)
@@ -634,12 +665,13 @@ func HTTP(url string, opts ...HTTPOption) State {
 
 type HTTPInfo struct {
 	constraintsWrapper
-	Checksum   digest.Digest
-	Filename   string
-	Perm       int
-	UID        int
-	GID        int
-	ExtraHosts Hosts
+	Checksum      digest.Digest
+	Filename      string
+	Perm          int
+	UID           int
+	GID           int
+	ExtraHosts    Hosts
+	SearchDomains SearchDomains
 }
 
 type HTTPOption interface {

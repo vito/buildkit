@@ -30,13 +30,15 @@ const (
 	CapSourceGitMountSSHSock  apicaps.CapID = "source.git.mountsshsock"
 	CapSourceGitSubdir        apicaps.CapID = "source.git.subdir"
 
-	CapSourceHTTP           apicaps.CapID = "source.http"
-	CapSourceHTTPChecksum   apicaps.CapID = "source.http.checksum"
-	CapSourceHTTPPerm       apicaps.CapID = "source.http.perm"
-	CapSourceHTTPUIDGID     apicaps.CapID = "soruce.http.uidgid" // NB: typo here, can it be changed?
-	CapSourceHTTPExtraHosts apicaps.CapID = "source.http.extrahosts"
+	CapSourceHTTP              apicaps.CapID = "source.http"
+	CapSourceHTTPChecksum      apicaps.CapID = "source.http.checksum"
+	CapSourceHTTPPerm          apicaps.CapID = "source.http.perm"
+	CapSourceHTTPUIDGID        apicaps.CapID = "soruce.http.uidgid" // NB: typo here, can it be changed?
+	CapSourceHTTPExtraHosts    apicaps.CapID = "source.http.extrahosts"
+	CapSourceHTTPSearchDomains apicaps.CapID = "source.http.searchdomains"
 
-	CapSourceGitExtraHosts apicaps.CapID = "source.git.extrahosts"
+	CapSourceGitExtraHosts    apicaps.CapID = "source.git.extrahosts"
+	CapSourceGitSearchDomains apicaps.CapID = "source.git.searchdomains"
 
 	CapSourceOCILayout apicaps.CapID = "source.ocilayout"
 
@@ -237,7 +239,19 @@ func init() {
 	})
 
 	Caps.Init(apicaps.Cap{
+		ID:      CapSourceHTTPSearchDomains,
+		Enabled: true,
+		Status:  apicaps.CapStatusExperimental,
+	})
+
+	Caps.Init(apicaps.Cap{
 		ID:      CapSourceGitExtraHosts,
+		Enabled: true,
+		Status:  apicaps.CapStatusExperimental,
+	})
+
+	Caps.Init(apicaps.Cap{
+		ID:      CapSourceGitSearchDomains,
 		Enabled: true,
 		Status:  apicaps.CapStatusExperimental,
 	})

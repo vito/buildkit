@@ -143,6 +143,7 @@ func NewWorkerOpt(root string, snFactory SnapshotterFactory, rootless bool, proc
 		Labels:           xlabels,
 		MetadataStore:    md,
 		NetworkProviders: np,
+		DNSConfig:        dns,
 		Executor:         exe,
 		Snapshotter:      snap,
 		ContentStore:     c,

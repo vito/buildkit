@@ -137,6 +137,7 @@ func newContainerd(root string, client *containerd.Client, snapshotterName, ns s
 		Labels:           xlabels,
 		MetadataStore:    md,
 		NetworkProviders: np,
+		DNSConfig:        dns,
 		Executor:         containerdexecutor.New(client, root, "", np, dns, apparmorProfile, selinux, traceSocket, rootless),
 		Snapshotter:      snap,
 		ContentStore:     cs,

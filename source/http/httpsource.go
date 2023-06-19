@@ -17,6 +17,7 @@ import (
 
 	"github.com/docker/docker/pkg/idtools"
 	"github.com/moby/buildkit/cache"
+	"github.com/moby/buildkit/executor/oci"
 	"github.com/moby/buildkit/session"
 	"github.com/moby/buildkit/snapshot"
 	"github.com/moby/buildkit/solver"
@@ -31,12 +32,14 @@ import (
 type Opt struct {
 	CacheAccessor cache.Accessor
 	Transport     http.RoundTripper
+	DNSConfig     *oci.DNSConfig
 }
 
 type httpSource struct {
 	cache     cache.Accessor
 	locker    *locker.Locker
 	transport http.RoundTripper
+	dns       *oci.DNSConfig
 }
 
 func NewSource(opt Opt) (source.Source, error) {
@@ -48,6 +51,7 @@ func NewSource(opt Opt) (source.Source, error) {
 		cache:     opt.CacheAccessor,
 		locker:    locker.New(),
 		transport: transport,
+		dns:       opt.DNSConfig,
 	}
 	return hs, nil
 }
@@ -77,8 +81,8 @@ func (hs *httpSource) Resolve(ctx context.Context, id source.Identifier, sm *ses
 	}, nil
 }
 
-func (hs *httpSourceHandler) client(g session.Group, extraHosts string) *http.Client {
-	return &http.Client{Transport: newTransport(hs.transport, hs.sm, g, extraHosts)}
+func (hs *httpSourceHandler) client(g session.Group, extraHosts, searchDomains string) *http.Client {
+	return &http.Client{Transport: newTransport(hs.transport, hs.sm, hs.dns, g, extraHosts, searchDomains)}
 }
 
 // urlHash is internal hash the etag is stored by that doesn't leak outside
@@ -171,7 +175,7 @@ func (hs *httpSourceHandler) CacheKey(ctx context.Context, g session.Group, inde
 		}
 	}
 
-	client := hs.client(g, hs.src.ExtraHosts)
+	client := hs.client(g, hs.src.ExtraHosts, hs.src.SearchDomains)
 
 	// Some servers seem to have trouble supporting If-None-Match properly even
 	// though they return ETag-s. So first, optionally try a HEAD request with
@@ -393,7 +397,7 @@ func (hs *httpSourceHandler) Snapshot(ctx context.Context, g session.Group) (cac
 	}
 	req = req.WithContext(ctx)
 
-	client := hs.client(g, hs.src.ExtraHosts)
+	client := hs.client(g, hs.src.ExtraHosts, hs.src.SearchDomains)
 
 	resp, err := client.Do(req)
 	if err != nil {

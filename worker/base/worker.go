@@ -20,6 +20,7 @@ import (
 	"github.com/moby/buildkit/client"
 	"github.com/moby/buildkit/client/llb"
 	"github.com/moby/buildkit/executor"
+	"github.com/moby/buildkit/executor/oci"
 	"github.com/moby/buildkit/exporter"
 	imageexporter "github.com/moby/buildkit/exporter/containerimage"
 	localexporter "github.com/moby/buildkit/exporter/local"
@@ -66,6 +67,7 @@ type WorkerOpt struct {
 	GCPolicy         []client.PruneInfo
 	BuildkitVersion  client.BuildkitVersion
 	NetworkProviders map[pb.NetMode]network.Provider
+	DNSConfig        *oci.DNSConfig
 	Executor         executor.Executor
 	Snapshotter      snapshot.Snapshotter
 	ContentStore     *containerdsnapshot.Store
@@ -138,6 +140,7 @@ func NewWorker(ctx context.Context, opt WorkerOpt) (*Worker, error) {
 	if err := git.Supported(); err == nil {
 		gs, err := git.NewSource(git.Opt{
 			CacheAccessor: cm,
+			DNSConfig:     opt.DNSConfig,
 		})
 		if err != nil {
 			return nil, err
@@ -149,6 +152,7 @@ func NewWorker(ctx context.Context, opt WorkerOpt) (*Worker, error) {
 
 	hs, err := http.NewSource(http.Opt{
 		CacheAccessor: cm,
+		DNSConfig:     opt.DNSConfig,
 	})
 	if err != nil {
 		return nil, err
