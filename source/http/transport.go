@@ -98,7 +98,7 @@ func (h *sessionHandler) RoundTrip(req *http.Request) (*http.Response, error) {
 		log.Println("!!! RT REMAPPED HOSTS", id, req.URL.Host, h.hosts)
 	}
 
-	if !remapped && len(h.searchDomains) > 0 {
+	if !remapped && strings.Count(req.URL.Host, ".") == 0 && len(h.searchDomains) > 0 {
 		log.Println("!!! RT SEARCH DOMAINS", id, req.URL.Host, h.searchDomains)
 
 		if host, port, err := net.SplitHostPort(req.URL.Host); err == nil {
